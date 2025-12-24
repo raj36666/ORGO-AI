@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Chat Agent</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root{
+  --bg:#f3f4f6;
+  --card:#ffffff;
+  --user:#10a37f;
+  --ai:#e5e7eb;
+  --text:#000;
+}
+.dark{
+  --bg:#020617;
+  --card:#020617;
+  --user:#10a37f;
+  --ai:#1e293b;
+  --text:#fff;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:system-ui,-apple-system;
+  background:var(--bg);
+  color:var(--text);
+}
+.app{
+  max-width:520px;
+  height:100vh;
+  margin:auto;
+  display:flex;
+  flex-direction:column;
+  background:var(--card);
+}
+.header{
+  padding:12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:#10a37f;
+  color:#fff;
+  font-weight:600;
+}
+.header button{
+  background:none;
+  border:none;
+  color:#fff;
+  font-size:18px;
+  cursor:pointer;
+}
+.chat{
+  flex:1;
+  padding:12px;
+  overflow-y:auto;
+}
+.msg{
+  max-width:80%;
+  padding:10px 12px;
+  margin:8px 0;
+  border-radius:12px;
+  line-height:1.4;
+  font-size:14px;
+}
+.user{
+  background:var(--user);
+  color:#fff;
+  margin-left:auto;
+}
+.ai{
+  background:var(--ai);
+  color:var(--text);
+  margin-right:auto;
+}
+.typing{
+  font-size:12px;
+  opacity:.6;
+  margin:5px;
+}
+.input-area{
+  padding:10px;
+  border-top:1px solid #ccc;
+}
+.row{
+  display:flex;
+}
+input{
+  flex:1;
+  padding:10px 14px;
+  border-radius:20px;
+  border:1px solid #ccc;
+  outline:none;
+}
+.send{
+  margin-left:6px;
+  padding:10px 14px;
+  border:none;
+  border-radius:50%;
+  background:#10a37f;
+  color:#fff;
+  font-size:16px;
+}
+.tools{
+  display:flex;
+  margin-top:6px;
+}
+.tools button{
+  flex:1;
+  margin:2px;
+  padding:6px;
+  border:none;
+  border-radius:8px;
+  font-size:12px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app" id="app">
+  <div class="header">
+    <span>🤖 AI Assistant</span>
+    <div>
+      <button onclick="toggleTheme()">🌙</button>
+      <button onclick="clearChat()">🗑️</button>
+    </div>
+  </div>
+
+  <div id="chat" class="chat"></div>
+
+  <div class="input-area">
+    <div class="row">
+      <input id="input" placeholder="বাংলা বা English লিখুন..." />
+      <button class="send" onclick="send()">➤</button>
+    </div>
+    <div class="tools">
+      <button onclick="imageAI()">🖼️ Image AI</button>
+      <button onclick="save()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE";
+const chat = document.getElementById("chat");
+const app = document.getElementById("app");
+
+function msg(text,who){
+  const d=document.createElement("div");
+  d.className="msg "+who;
+  d.innerText=text;
+  chat.appendChild(d);
+  chat.scrollTop=chat.scrollHeight;
+}
+
+function typing(on){
+  if(on){
+    const t=document.createElement("div");
+    t.id="typing";
+    t.className="typing";
+    t.innerText="AI চিন্তা করছে...";
+    chat.appendChild(t);
+  }else{
+    document.getElementById("typing")?.remove();
+  }
+}
+
+async function send(){
+  const i=document.getElementById("input");
+  const text=i.value.trim();
+  if(!text) return;
+  msg(text,"user");
+  i.value="";
+  typing(true);
+
+  try{
+    const r=await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key="+API_KEY,
+      {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          contents:[{parts:[{text:text}]}]
+        })
+      }
+    );
+    const j=await r.json();
+    typing(false);
+    msg(j.candidates[0].content.parts[0].text,"ai");
+    save();
+  }catch{
+    typing(false);
+    msg("AI error","ai");
+  }
+}
+
+function toggleTheme(){
+  app.classList.toggle("dark");
+  localStorage.theme=app.classList.contains("dark")?"dark":"light";
+}
+
+function save(){
+  localStorage.chat=chat.innerHTML;
+}
+
+function load(){
+  if(localStorage.chat) chat.innerHTML=localStorage.chat;
+  if(localStorage.theme==="dark") app.classList.add("dark");
+}
+
+function clearChat(){
+  if(confirm("Chat clear করবেন?")){
+    chat.innerHTML="";
+    localStorage.removeItem("chat");
+  }
+}
+
+async function imageAI(){
+  const p=prompt("Image prompt লিখুন:");
+  if(!p) return;
+  msg("🖼️ "+p,"user");
+  typing(true);
+  try{
+    const r=await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key="+API_KEY,
+      {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          contents:[{parts:[{text:"Describe an image for: "+p}]}]
+        })
+      }
+    );
+    const j=await r.json();
+    typing(false);
+    msg("🖼️ Image description:\n"+j.candidates[0].content.parts[0].text,"ai");
+  }catch{
+    typing(false);
+    msg("Image AI error","ai");
+  }
+}
+
+load();
+</script>
+
+</body>
+  </html>
