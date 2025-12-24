@@ -113,6 +113,7 @@ input{
   border:none;
   border-radius:8px;
   font-size:12px;
+  cursor:pointer;
 }
 </style>
 </head>
@@ -133,28 +134,31 @@ input{
   <div class="input-area">
     <div class="row">
       <input id="input" placeholder="বাংলা বা English লিখুন..." />
-      <button class="send" onclick="send()">➤</button>
+      <button class="send" onclick="sendMessage()">➤</button>
     </div>
     <div class="tools">
       <button onclick="imageAI()">🖼️ Image AI</button>
-      <button onclick="save()">💾 Save</button>
+      <button onclick="saveChat()">💾 Save</button>
     </div>
   </div>
 </div>
 
 <script>
-const API_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE";
+// 🔑 OpenRouter API key
+const API_KEY = "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";
 const chat = document.getElementById("chat");
 const app = document.getElementById("app");
 
-function msg(text,who){
-  const d=document.createElement("div");
-  d.className="msg "+who;
-  d.innerText=text;
-  chat.appendChild(d);
+// Message display
+function addMessage(text,sender){
+  const m=document.createElement("div");
+  m.className="msg "+sender;
+  m.innerText=text;
+  chat.appendChild(m);
   chat.scrollTop=chat.scrollHeight;
 }
 
+// Typing indicator
 function typing(on){
   if(on){
     const t=document.createElement("div");
@@ -167,49 +171,57 @@ function typing(on){
   }
 }
 
-async function send(){
-  const i=document.getElementById("input");
-  const text=i.value.trim();
+// Send message to OpenRouter API
+async function sendMessage(){
+  const input=document.getElementById("input");
+  const text=input.value.trim();
   if(!text) return;
-  msg(text,"user");
-  i.value="";
+  addMessage(text,"user");
+  input.value="";
   typing(true);
 
   try{
-    const r=await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key="+API_KEY,
-      {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          contents:[{parts:[{text:text}]}]
-        })
-      }
-    );
-    const j=await r.json();
+    const res=await fetch("https://openrouter.ai/api/v1/chat/completions",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization":"Bearer "+API_KEY
+      },
+      body:JSON.stringify({
+        model:"mistralai/mistral-7b-instruct",
+        messages:[
+          {role:"user", content:text}
+        ]
+      })
+    });
+    const data=await res.json();
     typing(false);
-    msg(j.candidates[0].content.parts[0].text,"ai");
-    save();
-  }catch{
+    addMessage(data.choices[0].message.content,"ai");
+    saveChat();
+  }catch(err){
     typing(false);
-    msg("AI error","ai");
+    addMessage("AI error: "+err,"ai");
   }
 }
 
+// Dark / Light toggle
 function toggleTheme(){
   app.classList.toggle("dark");
   localStorage.theme=app.classList.contains("dark")?"dark":"light";
 }
 
-function save(){
+// Save chat
+function saveChat(){
   localStorage.chat=chat.innerHTML;
 }
 
-function load(){
+// Load chat
+function loadChat(){
   if(localStorage.chat) chat.innerHTML=localStorage.chat;
   if(localStorage.theme==="dark") app.classList.add("dark");
 }
 
+// Clear chat
 function clearChat(){
   if(confirm("Chat clear করবেন?")){
     chat.innerHTML="";
@@ -217,32 +229,34 @@ function clearChat(){
   }
 }
 
+// Image AI (text description)
 async function imageAI(){
-  const p=prompt("Image prompt লিখুন:");
-  if(!p) return;
-  msg("🖼️ "+p,"user");
+  const prompt=prompt("Image prompt লিখুন:");
+  if(!prompt) return;
+  addMessage("🖼️ "+prompt,"user");
   typing(true);
   try{
-    const r=await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key="+API_KEY,
-      {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          contents:[{parts:[{text:"Describe an image for: "+p}]}]
-        })
-      }
-    );
-    const j=await r.json();
+    const res=await fetch("https://openrouter.ai/api/v1/chat/completions",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization":"Bearer "+API_KEY
+      },
+      body:JSON.stringify({
+        model:"mistralai/mistral-7b-instruct",
+        messages:[{role:"user",content:"Describe an image for: "+prompt}]
+      })
+    });
+    const data=await res.json();
     typing(false);
-    msg("🖼️ Image description:\n"+j.candidates[0].content.parts[0].text,"ai");
-  }catch{
+    addMessage("🖼️ Image description:\n"+data.choices[0].message.content,"ai");
+  }catch(err){
     typing(false);
-    msg("Image AI error","ai");
+    addMessage("Image AI error: "+err,"ai");
   }
 }
 
-load();
+loadChat();
 </script>
 
 </body>
